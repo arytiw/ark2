@@ -1,0 +1,13 @@
+{
+  "name": "offline-ai-coding-assistant",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "runtime",
+    "extension",
+    "tools",
+    "agent",
+    "context"
+  ]
+}
+

@@ -1,0 +1,56 @@
+{
+  "runtime": {
+    "host": "127.0.0.1",
+    "port": 8765,
+    "auditLogDir": "./runtime/audit"
+  },
+  "llm": {
+    "backend": "ollama",
+    "ollamaBaseUrl": "http://127.0.0.1:11434",
+    "ollamaModel": "llama3.2:latest",
+    "modelPath": "./models/your-model.gguf",
+    "llamaBinPath": "./runtime/bin/llama-cli",
+    "contextTokens": 4096,
+    "temperature": 0.2,
+    "topP": 0.95,
+    "seed": 42,
+    "threads": 8,
+    "gpuLayers": 0
+  },
+  "tools": {
+    "host": "127.0.0.1",
+    "port": 8766,
+    "auditLogDir": "./tools/audit",
+    "backupDir": "./.offline-assistant/backups",
+    "maxFileBytes": 5242880,
+    "maxListEntries": 20000,
+    "maxSearchMatches": 20000
+  },
+  "agent": {
+    "host": "127.0.0.1",
+    "port": 8767,
+    "auditLogDir": "./agent/audit",
+    "maxSteps": 12,
+    "timeoutMs": 45000,
+    "modelSource": "runtime",
+    "llmMaxTokens": 512
+  },
+  "embeddings": {
+    "host": "127.0.0.1",
+    "port": 8768,
+    "auditLogDir": "./embeddings/audit",
+    "indexDir": "./embeddings/index",
+    "backend": "mock",
+    "dim": 384,
+    "maxTextBytes": 262144,
+    "maxBatch": 256,
+    "llamaBinPath": "./embeddings/bin/llama-embed",
+    "modelPath": "./models/your-embedder.gguf"
+  },
+  "context": {
+    "auditLogDir": "./context/audit",
+    "chunkChars": 2000,
+    "chunkOverlap": 200,
+    "maxFiles": 20000
+  }
+}

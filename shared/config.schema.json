@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Offline Coding Assistant Config",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "host": { "type": "string", "default": "127.0.0.1" },
+        "port": { "type": "integer", "minimum": 1, "maximum": 65535, "default": 8765 },
+        "auditLogDir": { "type": "string", "default": "./runtime/audit" }
+      },
+      "required": ["host", "port", "auditLogDir"]
+    },
+    "llm": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "backend": { "type": "string", "enum": ["llamacpp", "ollama", "mock"], "default": "llamacpp" },
+        "modelPath": { "type": "string" },
+        "llamaBinPath": { "type": "string", "default": "./runtime/bin/llama-cli" },
+        "ollamaBaseUrl": { "type": "string", "default": "http://127.0.0.1:11434" },
+        "ollamaModel": { "type": "string", "default": "gpt-oss:20b" },
+        "contextTokens": { "type": "integer", "minimum": 128, "maximum": 32768, "default": 4096 },
+        "temperature": { "type": "number", "minimum": 0, "maximum": 2, "default": 0.2 },
+        "topP": { "type": "number", "minimum": 0, "maximum": 1, "default": 0.95 },
+        "seed": { "type": "integer", "minimum": 0, "maximum": 2147483647, "default": 42 },
+        "threads": { "type": "integer", "minimum": 1, "maximum": 128, "default": 8 },
+        "gpuLayers": { "type": "integer", "minimum": 0, "maximum": 200, "default": 0 }
+      },
+      "required": ["backend", "modelPath", "llamaBinPath", "contextTokens", "temperature", "topP", "seed", "threads", "gpuLayers"]
+    },
+    "tools": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "host": { "type": "string", "default": "127.0.0.1" },
+        "port": { "type": "integer", "minimum": 1, "maximum": 65535, "default": 8766 },
+        "auditLogDir": { "type": "string", "default": "./tools/audit" },
+        "backupDir": { "type": "string", "default": "./.offline-assistant/backups" },
+        "maxFileBytes": { "type": "integer", "minimum": 1, "maximum": 104857600, "default": 5242880 },
+        "maxListEntries": { "type": "integer", "minimum": 1, "maximum": 200000, "default": 20000 },
+        "maxSearchMatches": { "type": "integer", "minimum": 1, "maximum": 200000, "default": 20000 }
+      },
+      "required": ["host", "port", "auditLogDir", "backupDir", "maxFileBytes", "maxListEntries", "maxSearchMatches"]
+    },
+    "agent": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "host": { "type": "string", "default": "127.0.0.1" },
+        "port": { "type": "integer", "minimum": 1, "maximum": 65535, "default": 8767 },
+        "auditLogDir": { "type": "string", "default": "./agent/audit" },
+        "maxSteps": { "type": "integer", "minimum": 1, "maximum": 100, "default": 12 },
+        "timeoutMs": { "type": "integer", "minimum": 100, "maximum": 600000, "default": 45000 },
+        "modelSource": { "type": "string", "enum": ["runtime", "mock"], "default": "runtime" },
+        "llmMaxTokens": { "type": "integer", "minimum": 16, "maximum": 2048, "default": 512 }
+      },
+      "required": ["host", "port", "auditLogDir", "maxSteps", "timeoutMs", "modelSource", "llmMaxTokens"]
+    },
+    "embeddings": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "host": { "type": "string", "default": "127.0.0.1" },
+        "port": { "type": "integer", "minimum": 1, "maximum": 65535, "default": 8768 },
+        "auditLogDir": { "type": "string", "default": "./embeddings/audit" },
+        "indexDir": { "type": "string", "default": "./embeddings/index" },
+        "backend": { "type": "string", "enum": ["mock", "llamacpp"], "default": "mock" },
+        "dim": { "type": "integer", "minimum": 8, "maximum": 4096, "default": 384 },
+        "maxTextBytes": { "type": "integer", "minimum": 1, "maximum": 10485760, "default": 262144 },
+        "maxBatch": { "type": "integer", "minimum": 1, "maximum": 2048, "default": 256 },
+        "llamaBinPath": { "type": "string", "default": "./embeddings/bin/llama-embed" },
+        "modelPath": { "type": "string", "default": "./models/your-embedder.gguf" }
+      },
+      "required": ["host", "port", "auditLogDir", "indexDir", "backend", "dim", "maxTextBytes", "maxBatch", "llamaBinPath", "modelPath"]
+    },
+    "context": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "auditLogDir": { "type": "string", "default": "./context/audit" },
+        "chunkChars": { "type": "integer", "minimum": 200, "maximum": 20000, "default": 2000 },
+        "chunkOverlap": { "type": "integer", "minimum": 0, "maximum": 5000, "default": 200 },
+        "maxFiles": { "type": "integer", "minimum": 1, "maximum": 200000, "default": 20000 }
+      },
+      "required": ["auditLogDir", "chunkChars", "chunkOverlap", "maxFiles"]
+    }
+  },
+  "required": ["runtime", "llm", "tools", "agent", "embeddings", "context"]
+}

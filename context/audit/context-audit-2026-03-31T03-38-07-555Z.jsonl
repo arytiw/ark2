@@ -1,0 +1,17 @@
+{"t":1774928287575,"kind":"build_start","toolsUrl":"ws://127.0.0.1:8766","embUrl":"ws://127.0.0.1:8768"}
+{"t":1774928289207,"kind":"build_progress","totalFiles":25,"totalChunks":117}
+{"t":1774928289900,"kind":"build_progress","totalFiles":50,"totalChunks":292}
+{"t":1774928290662,"kind":"build_progress","totalFiles":75,"totalChunks":492}
+{"t":1774928291751,"kind":"build_progress","totalFiles":100,"totalChunks":1288}
+{"t":1774928292573,"kind":"build_progress","totalFiles":125,"totalChunks":1572}
+{"t":1774928293648,"kind":"build_progress","totalFiles":150,"totalChunks":2203}
+{"t":1774928295907,"kind":"build_progress","totalFiles":175,"totalChunks":4527}
+{"t":1774928296855,"kind":"build_progress","totalFiles":200,"totalChunks":4563}
+{"t":1774928297718,"kind":"build_progress","totalFiles":225,"totalChunks":4639}
+{"t":1774928298641,"kind":"build_progress","totalFiles":250,"totalChunks":4826}
+{"t":1774928300577,"kind":"build_progress","totalFiles":275,"totalChunks":6531}
+{"t":1774928301716,"kind":"build_progress","totalFiles":300,"totalChunks":6601}
+{"t":1774928302671,"kind":"build_progress","totalFiles":325,"totalChunks":6645}
+{"t":1774928303677,"kind":"build_progress","totalFiles":350,"totalChunks":6754}
+{"t":1774928304796,"kind":"build_progress","totalFiles":375,"totalChunks":7002}
+{"t":1774928304836,"kind":"build_done","totalFiles":376,"totalChunks":7003}

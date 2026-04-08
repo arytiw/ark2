@@ -1,0 +1,5 @@
+{"t":1773856517200,"kind":"server_start","host":"127.0.0.1","port":8766,"workspaceRoot":"C:\\Users\\frtiw\\OneDrive\\Documents\\Desktop\\major project coder"}
+{"t":1773856520232,"kind":"client_connect","clientId":"a40ea1c46d9b1b0d851d70b8","remote":"127.0.0.1"}
+{"t":1773856520237,"kind":"tool_call","clientId":"a40ea1c46d9b1b0d851d70b8","requestId":"1","tool":"read_file","params":{"path":"README.md"}}
+{"t":1773856520241,"kind":"tool_result","clientId":"a40ea1c46d9b1b0d851d70b8","requestId":"1","ok":true,"elapsedMs":4}
+{"t":1773856520248,"kind":"client_disconnect","clientId":"a40ea1c46d9b1b0d851d70b8"}

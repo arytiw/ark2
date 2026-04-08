@@ -1,0 +1,16 @@
+{"t":1773855822707,"kind":"server_start","host":"127.0.0.1","port":8765}
+{"t":1773855828056,"kind":"client_connect","clientId":"397ef6ee01342a08ad5fc8ca","remote":"127.0.0.1"}
+{"t":1773855828061,"kind":"request_start","clientId":"397ef6ee01342a08ad5fc8ca","requestId":"1","promptBytes":7}
+{"t":1773855828062,"kind":"request_token","clientId":"397ef6ee01342a08ad5fc8ca","requestId":"1","tokenBytes":12}
+{"t":1773855828074,"kind":"request_token","clientId":"397ef6ee01342a08ad5fc8ca","requestId":"1","tokenBytes":12}
+{"t":1773855828089,"kind":"request_token","clientId":"397ef6ee01342a08ad5fc8ca","requestId":"1","tokenBytes":12}
+{"t":1773855828105,"kind":"request_token","clientId":"397ef6ee01342a08ad5fc8ca","requestId":"1","tokenBytes":12}
+{"t":1773855828121,"kind":"request_token","clientId":"397ef6ee01342a08ad5fc8ca","requestId":"1","tokenBytes":12}
+{"t":1773855828137,"kind":"request_token","clientId":"397ef6ee01342a08ad5fc8ca","requestId":"1","tokenBytes":12}
+{"t":1773855828153,"kind":"request_token","clientId":"397ef6ee01342a08ad5fc8ca","requestId":"1","tokenBytes":12}
+{"t":1773855828168,"kind":"request_token","clientId":"397ef6ee01342a08ad5fc8ca","requestId":"1","tokenBytes":12}
+{"t":1773855828184,"kind":"request_token","clientId":"397ef6ee01342a08ad5fc8ca","requestId":"1","tokenBytes":12}
+{"t":1773855828201,"kind":"request_token","clientId":"397ef6ee01342a08ad5fc8ca","requestId":"1","tokenBytes":12}
+{"t":1773855828217,"kind":"request_token","clientId":"397ef6ee01342a08ad5fc8ca","requestId":"1","tokenBytes":6}
+{"t":1773855828233,"kind":"request_end","clientId":"397ef6ee01342a08ad5fc8ca","requestId":"1","reason":"eos","elapsedMs":172}
+{"t":1773855828246,"kind":"client_disconnect","clientId":"397ef6ee01342a08ad5fc8ca"}

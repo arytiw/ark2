@@ -1,0 +1,99 @@
+{
+  "name": "@offline-assistant/extension",
+  "displayName": "Offline AI Coding Assistant",
+  "description": "Offline-first, air-gapped AI coding assistant (Phase 2: runtime integration).",
+  "version": "0.1.0",
+  "publisher": "local",
+  "private": true,
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": ["Other"],
+  "activationEvents": [
+    "onCommand:offlineAssistant.connect",
+    "onCommand:offlineAssistant.generate",
+    "onCommand:offlineAssistant.cancel",
+    "*"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "offlineAssistant.connect",
+        "title": "Offline Assistant: Connect to Runtime"
+      },
+      {
+        "command": "offlineAssistant.generate",
+        "title": "Offline Assistant: Generate (Stream to Output)"
+      },
+      {
+        "command": "offlineAssistant.cancel",
+        "title": "Offline Assistant: Cancel Current Generation"
+      },
+      {
+        "command": "offlineAssistant.toggleInlineCompletion",
+        "title": "Offline Assistant: Toggle Inline Completion"
+      }
+    ],
+    "configuration": {
+      "title": "Offline Assistant",
+      "type": "object",
+      "properties": {
+        "offlineAssistant.inlineCompletionEnabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable inline completions via the local runtime."
+        },
+        "offlineAssistant.completionMaxTokens": {
+          "type": "number",
+          "default": 256,
+          "minimum": 1,
+          "maximum": 2048,
+          "description": "Max tokens requested for inline completion."
+        },
+        "offlineAssistant.maxPrefixChars": {
+          "type": "number",
+          "default": 8000,
+          "minimum": 512,
+          "maximum": 50000,
+          "description": "Max characters before cursor included in prompt."
+        },
+        "offlineAssistant.maxSuffixChars": {
+          "type": "number",
+          "default": 2000,
+          "minimum": 0,
+          "maximum": 20000,
+          "description": "Max characters after cursor included in prompt."
+        },
+        "offlineAssistant.ragTopK": {
+          "type": "number",
+          "default": 6,
+          "minimum": 1,
+          "maximum": 20,
+          "description": "How many retrieved code snippets to include in completion prompts."
+        },
+        "offlineAssistant.ragTimeoutMs": {
+          "type": "number",
+          "default": 80,
+          "minimum": 10,
+          "maximum": 2000,
+          "description": "Timeout budget for RAG lookup in completion path."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "watch": "tsc -p tsconfig.json -w"
+  },
+  "dependencies": {
+    "ws": "^8.18.3"
+  },
+  "devDependencies": {
+    "@types/node": "^24.1.0",
+    "@types/vscode": "^1.90.0",
+    "@types/ws": "^8.18.1",
+    "typescript": "^5.8.2"
+  }
+}
+
