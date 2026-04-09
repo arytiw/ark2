@@ -31,12 +31,15 @@ export type Config = {
     auditLogDir: string;
   };
   llm: {
-    backend: "llamacpp" | "mock" | "ollama";
+    backend: "llamacpp" | "mock" | "ollama" | "gemini";
     modelPath: string;
     llamaBinPath: string;
     // Ollama config (used only when llm.backend === "ollama")
     ollamaBaseUrl?: string;
     ollamaModel?: string;
+    // Gemini config (used only when llm.backend === "gemini")
+    geminiApiKey?: string;
+    geminiModel?: string;
     contextTokens: number;
     temperature: number;
     topP: number;

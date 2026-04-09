@@ -23,15 +23,16 @@ npm run build:all
 *(Note: If `npm run build:all` is not in your root package.json, you can manually build each directory: `runtime`, `tools`, `agent`, `extension`)*
 
 ### 3. Configure your LLM
-Copy `config.json` and adjust it to point to your local LLM (defaults to Ollama):
+Copy `config.json` and adjust it to point to your local LLM:
 
-```json
-"llm": {
-  "backend": "ollama",
-  "ollamaBaseUrl": "http://127.0.0.1:11434",
-  "ollamaModel": "qwen2.5-coder:latest"
-}
-```
+- **Ollama** (optional): Required only if `config.json` has `"llm.backend": "ollama"`
+  - Base URL: `llm.ollamaBaseUrl` (default `http://127.0.0.1:11434`)
+  - Model name: `llm.ollamaModel` (example: `qwen2.5-coder:latest`)
+
+- **Gemini** (optional): Required only if `config.json` has `"llm.backend": "gemini"`
+  - API Key: `llm.geminiApiKey`
+  - Model: `llm.geminiModel` (default `gemini-1.5-flash`)
+  - Note: This backend **simulates streaming** for UI compatibility.
 
 ### 4. Start the Backend Services
 Open four terminal windows and start the core stack:

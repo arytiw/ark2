@@ -11,6 +11,7 @@ import type { LlmBackend, ServerToClient } from "./types";
 import { MockBackend } from "./backends/mock";
 import { LlamaCppCliBackend } from "./backends/llamacpp";
 import { OllamaBackend } from "./backends/ollama";
+import { GeminiBackend } from "./backends/gemini";
 
 const logger = new Logger("runtime");
 
@@ -56,6 +57,11 @@ async function main() {
       topP: cfg.llm.topP,
       seed: cfg.llm.seed,
       threads: cfg.llm.threads
+    });
+  } else if (cfg.llm.backend === "gemini") {
+    backend = new GeminiBackend({
+      apiKey: cfg.llm.geminiApiKey ?? "",
+      model: cfg.llm.geminiModel ?? "gemini-1.5-flash"
     });
   } else {
     backend = new LlamaCppCliBackend(cfg.llm);

@@ -41,8 +41,8 @@ export function loadConfig(projectRoot: string): Config {
   const auditLogDir = reqString(runtime.auditLogDir, "runtime.auditLogDir");
 
   const backend = reqString(llm.backend, "llm.backend");
-  if (backend !== "llamacpp" && backend !== "mock" && backend !== "ollama") {
-    throw new Error("llm.backend must be 'llamacpp', 'ollama', or 'mock'");
+  if (backend !== "llamacpp" && backend !== "mock" && backend !== "ollama" && backend !== "gemini") {
+    throw new Error("llm.backend must be 'llamacpp', 'ollama', 'gemini', or 'mock'");
   }
 
   const modelPath = reqString(llm.modelPath, "llm.modelPath");
@@ -56,12 +56,19 @@ export function loadConfig(projectRoot: string): Config {
   const threads = reqInt(llm.threads, "llm.threads", 1, 128);
   const gpuLayers = reqInt(llm.gpuLayers, "llm.gpuLayers", 0, 200);
 
+  const geminiApiKey = typeof llm.geminiApiKey === "string" ? llm.geminiApiKey : "";
+  const geminiModel = typeof llm.geminiModel === "string" ? llm.geminiModel : "gemini-1.5-flash";
+
   if (backend === "ollama") {
     if (!ollamaModel) throw new Error("llm.ollamaModel must be a non-empty string when llm.backend='ollama'");
     // Basic safety: avoid accidental remote URLs; allow only localhost/loopback by default.
     if (!/^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?(\/.*)?$/i.test(ollamaBaseUrl)) {
       throw new Error("llm.ollamaBaseUrl must point to localhost/127.0.0.1 for offline mode.");
     }
+  }
+
+  if (backend === "gemini") {
+    if (!geminiApiKey) throw new Error("llm.geminiApiKey must be provided when backend is 'gemini'");
   }
 
   const cfg: Config = {
@@ -76,6 +83,8 @@ export function loadConfig(projectRoot: string): Config {
       llamaBinPath: normalizeRelToRoot(projectRoot, llamaBinPath),
       ollamaBaseUrl,
       ollamaModel: ollamaModel || undefined,
+      geminiApiKey: geminiApiKey || undefined,
+      geminiModel: geminiModel || undefined,
       contextTokens,
       temperature,
       topP,
