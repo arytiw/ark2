@@ -16,7 +16,7 @@ export type RootConfig = {
 };
 
 export type ClientToAgent =
-  | { type: "task"; taskId: string; instruction: string }
+  | { type: "task"; taskId: string; instruction: string; mode?: "chat" | "agent" | "plan" }
   | { type: "cancel"; taskId: string }
   | { type: "ping"; requestId: string };
 

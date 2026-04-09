@@ -4,12 +4,15 @@ import { WebSocketServer, WebSocket } from "ws";
 import type { RawData } from "ws";
 import type { IncomingMessage } from "node:http";
 import { loadConfig } from "./config";
-import { AuditLogger } from "./logger";
+import { AuditLogger } from "./audit";
+import { Logger } from "./logger";
 import { parseClientMessage } from "./validate";
 import type { LlmBackend, ServerToClient } from "./types";
 import { MockBackend } from "./backends/mock";
 import { LlamaCppCliBackend } from "./backends/llamacpp";
 import { OllamaBackend } from "./backends/ollama";
+
+const logger = new Logger("runtime");
 
 const VERSION = "0.1.0";
 
@@ -65,8 +68,10 @@ async function main() {
   });
 
   audit.log({ t: nowMs(), kind: "server_start", host: cfg.runtime.host, port: cfg.runtime.port });
+  logger.info("Runtime server started", { host: cfg.runtime.host, port: cfg.runtime.port });
 
   wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
+    logger.info("Client connected");
     const clientId = newClientId();
     const remote = req.socket.remoteAddress;
     audit.log({ t: nowMs(), kind: "client_connect", clientId, remote });
@@ -123,6 +128,7 @@ async function main() {
       const stop = msg.stop ?? [];
 
       audit.log({ t: nowMs(), kind: "request_start", clientId, requestId, promptBytes: Buffer.byteLength(prompt, "utf8") });
+      logger.info("Generate request received", { requestId });
 
       try {
         const reason = await backend.generate(
@@ -130,6 +136,7 @@ async function main() {
           (token) => {
             // Non-blocking on WS send: ws buffers internally; if backpressure becomes a problem, we’ll add a bounded queue.
             audit.log({ t: nowMs(), kind: "request_token", clientId, requestId, tokenBytes: Buffer.byteLength(token, "utf8") });
+            logger.debug("Streaming token", { requestId, token });
             safeSend(ws, { type: "token", requestId, token });
           },
           ac.signal
@@ -139,6 +146,7 @@ async function main() {
         active.delete(requestId);
         safeSend(ws, { type: "done", requestId, reason: reason === "stop" ? "stop" : "eos" });
         audit.log({ t: nowMs(), kind: "request_end", clientId, requestId, reason, elapsedMs: nowMs() - startedAt });
+        logger.info("Generation completed", { requestId, reason });
       } catch (e) {
         const startedAt = active.get(requestId)?.startedAt ?? nowMs();
         active.delete(requestId);
@@ -150,6 +158,7 @@ async function main() {
           code: aborted ? "E_CANCELLED" : "E_BACKEND",
           message: aborted ? "Cancelled." : (e instanceof Error ? e.message : "Backend error.")
         });
+        logger.error("Runtime error", { error: e instanceof Error ? e.message : String(e) });
         audit.log({
           t: nowMs(),
           kind: "request_end",

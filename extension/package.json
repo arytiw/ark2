@@ -17,6 +17,24 @@
   ],
   "main": "./dist/extension.js",
   "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "offline-assistant",
+          "title": "Offline Assistant",
+          "icon": "$(hubot)"
+        }
+      ]
+    },
+    "views": {
+      "offline-assistant": [
+        {
+          "type": "webview",
+          "id": "offlineAssistant.chat",
+          "name": "Chat"
+        }
+      ]
+    },
     "commands": [
       {
         "command": "offlineAssistant.connect",

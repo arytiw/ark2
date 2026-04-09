@@ -13,7 +13,8 @@ export function parseClientMsg(raw: unknown): { ok: true; msg: ClientToAgent } |
   if (type === "task") {
     if (!isNonEmptyString(raw.taskId)) return { ok: false, code: "E_BAD_REQUEST", message: "taskId must be non-empty string." };
     if (!isNonEmptyString(raw.instruction)) return { ok: false, code: "E_BAD_REQUEST", message: "instruction must be non-empty string." };
-    return { ok: true, msg: { type: "task", taskId: raw.taskId, instruction: raw.instruction } };
+    const mode = (raw.mode === "chat" || raw.mode === "agent" || raw.mode === "plan") ? raw.mode : undefined;
+    return { ok: true, msg: { type: "task", taskId: raw.taskId, instruction: raw.instruction, mode } };
   }
   if (type === "cancel") {
     if (!isNonEmptyString(raw.taskId)) return { ok: false, code: "E_BAD_REQUEST", message: "taskId must be non-empty string." };

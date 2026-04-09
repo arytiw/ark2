@@ -10,117 +10,87 @@ type OllamaConfig = {
   threads: number;
 };
 
-function normalizeBaseUrl(url: string): string {
-  return url.endsWith("/") ? url.slice(0, -1) : url;
-}
-
-function splitLines(buffer: string): { lines: string[]; rest: string } {
-  const parts = buffer.split("\n");
-  const rest = parts.pop() ?? "";
-  return { lines: parts, rest };
-}
-
 export class OllamaBackend implements LlmBackend {
-  private readonly baseUrl: string;
-
   constructor(private readonly cfg: OllamaConfig) {
-    this.baseUrl = normalizeBaseUrl(cfg.baseUrl);
+    // Localhost-only enforcement: prevent SSRF to external domains.
+    try {
+      const url = new URL(this.cfg.baseUrl);
+      const host = url.hostname;
+      if (host !== "localhost" && host !== "127.0.0.1" && host !== "[::1]") {
+        throw new Error(`Security violation: Ollama backend must use localhost. Received: ${host}`);
+      }
+    } catch (e) {
+      if (e instanceof Error && e.message.includes("Security violation")) throw e;
+      throw new Error(`Invalid Ollama baseUrl: ${this.cfg.baseUrl}`);
+    }
   }
 
   async generate(params: GenerateParams, onToken: TokenSink, signal: AbortSignal): Promise<"eos" | "stop"> {
-    const stopSeqs = params.stop;
-    let buffer = "";
+    const url = `${this.cfg.baseUrl.replace(/\/$/, "")}/api/generate`;
 
     const body = {
       model: this.cfg.model,
       prompt: params.prompt,
       stream: true,
-      // Ask Ollama to apply stop as well; we still enforce stop client-side deterministically.
-      stop: stopSeqs,
       options: {
-        num_ctx: this.cfg.contextTokens,
         num_predict: params.maxTokens,
+        stop: params.stop,
         temperature: this.cfg.temperature,
         top_p: this.cfg.topP,
         seed: this.cfg.seed,
-        num_thread: this.cfg.threads
+        num_thread: this.cfg.threads,
+        num_ctx: this.cfg.contextTokens
       }
     };
 
-    const res = await fetch(`${this.baseUrl}/api/generate`, {
+    const res = await fetch(url, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
       signal
     });
 
     if (!res.ok) {
-      const t = await res.text().catch(() => "");
-      throw new Error(`Ollama HTTP ${res.status}: ${t.slice(0, 400)}`);
+      const errorText = await res.text().catch(() => "Unknown error");
+      throw new Error(`Ollama error (${res.status}): ${errorText}`);
     }
-    if (!res.body) throw new Error("Ollama response has no body.");
+
+    if (!res.body) throw new Error("Ollama response body is empty");
 
     const reader = res.body.getReader();
-    const decoder = new TextDecoder("utf-8");
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let reason: "eos" | "stop" = "eos";
 
-    const maybeEmit = (text: string) => {
-      if (text.length === 0) return;
-      onToken(text);
-    };
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
 
-    while (true) {
-      if (signal.aborted) throw new DOMException("Aborted", "AbortError");
-      const { value, done } = await reader.read();
-      if (done) break;
-      const chunk = decoder.decode(value, { stream: true });
-      buffer += chunk;
+        buffer += decoder.decode(value, { stream: true });
+        
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
 
-      const split = splitLines(buffer);
-      buffer = split.rest;
-
-      for (const line of split.lines) {
-        const trimmed = line.trim();
-        if (!trimmed.length) continue;
-
-        let obj: unknown;
-        try {
-          obj = JSON.parse(trimmed);
-        } catch {
-          // Ignore malformed lines; keep deterministic behavior.
-          continue;
-        }
-
-        if (typeof obj !== "object" || obj === null) continue;
-        const rec = obj as Record<string, unknown>;
-        const responsePart = typeof rec.response === "string" ? rec.response : "";
-        const doneFlag = rec.done === true;
-
-        if (responsePart.length) {
-          buffer = buffer; // no-op (keeps logic obvious)
-
-          // Client-side stop enforcement: scan accumulated output to avoid split stop sequences.
-          // Keep a rolling tail in `outBuf`.
-          let outBuf = responsePart;
-          for (const stop of stopSeqs) {
-            const idx = outBuf.indexOf(stop);
-            if (idx !== -1) {
-              maybeEmit(outBuf.slice(0, idx));
-              return "stop";
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          try {
+            const parsed = JSON.parse(line);
+            if (parsed.response) {
+              onToken(parsed.response);
             }
+            if (parsed.done) {
+              if (parsed.done_reason === "stop") reason = "stop";
+            }
+          } catch (e) {
+            console.error("[OllamaBackend] JSON parse error", e);
           }
-
-          maybeEmit(outBuf);
-        }
-
-        if (doneFlag) {
-          // Ollama finished normally.
-          return "eos";
         }
       }
+    } finally {
+      reader.releaseLock();
     }
 
-    // If the stream ended without a done=true line, treat as eos.
-    return "eos";
+    return reason;
   }
 }
-

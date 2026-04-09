@@ -5,9 +5,12 @@ import type { RawData } from "ws";
 import type { IncomingMessage } from "node:http";
 import { loadToolsConfig } from "./config";
 import { AuditLogger } from "./audit";
+import { Logger } from "./logger";
 import { parseToolCall } from "./validate";
 import { ToolExecutor } from "./tools";
 import type { ServerMsg } from "./types";
+
+const logger = new Logger("tools");
 
 const VERSION = "0.1.0";
 
@@ -35,7 +38,7 @@ async function main() {
 
   const cfg = loadToolsConfig(projectRoot);
   const audit = new AuditLogger(cfg.auditLogDir);
-  const exec = new ToolExecutor(workspaceRoot, cfg);
+  const exec = new ToolExecutor(workspaceRoot, cfg, logger);
 
   const wss = new WebSocketServer({
     host: cfg.host,
@@ -44,8 +47,10 @@ async function main() {
   });
 
   audit.log({ t: nowMs(), kind: "server_start", host: cfg.host, port: cfg.port, workspaceRoot });
+  logger.info("Tools server started", { host: cfg.host, port: cfg.port, workspaceRoot });
 
   wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
+    logger.info("Client connected");
     const clientId = newClientId();
     const remote = req.socket.remoteAddress;
     audit.log({ t: nowMs(), kind: "client_connect", clientId, remote });
@@ -77,15 +82,18 @@ async function main() {
 
       const call = callRes.call;
       audit.log({ t: nowMs(), kind: "tool_call", clientId, requestId: call.requestId, tool: call.tool, params: call.params });
+      logger.info("Tool call received", { tool: call.tool, requestId: call.requestId });
 
-      const res = await exec.call(call.tool, call.params);
+      const res = await exec.call(call.tool, call.params, call.requestId);
       const elapsedMs = nowMs() - started;
       if (res.ok) {
         audit.log({ t: nowMs(), kind: "tool_result", clientId, requestId: call.requestId, ok: true, elapsedMs });
         safeSend(ws, { type: "tool_result", requestId: call.requestId, ok: true, result: res.result });
+        logger.info("Tool executed", { tool: call.tool, requestId: call.requestId });
       } else {
         audit.log({ t: nowMs(), kind: "tool_result", clientId, requestId: call.requestId, ok: false, code: res.code, elapsedMs });
         safeSend(ws, { type: "tool_result", requestId: call.requestId, ok: false, error: { code: res.code, message: res.message } });
+        logger.error("Tool failed", { tool: call.tool, error: res.message, requestId: call.requestId });
       }
     });
 

@@ -6,10 +6,13 @@ import { RuntimeClient } from "./runtimeClient";
 import type { ServerToClient } from "./protocol";
 import { InlineCompletionPipeline } from "./completionProvider";
 import { EmbeddingsClient } from "./embeddingsClient";
+import { ChatWebviewProvider } from "./chatWebviewProvider";
+import { AgentClient, type AgentEvent } from "./agentClient";
 
 type RootConfig = {
   runtime: { host: string; port: number };
   embeddings: { host: string; port: number };
+  agent: { host: string; port: number };
 };
 
 function tryReadRootConfig(workspaceRoot: string): RootConfig | null {
@@ -19,9 +22,15 @@ function tryReadRootConfig(workspaceRoot: string): RootConfig | null {
     if (typeof raw !== "object" || raw === null) return null;
     const r = (raw as any).runtime;
     const e = (raw as any).embeddings;
+    const a = (raw as any).agent;
     if (!r || typeof r.host !== "string" || typeof r.port !== "number") return null;
     if (!e || typeof e.host !== "string" || typeof e.port !== "number") return null;
-    return { runtime: { host: r.host, port: r.port }, embeddings: { host: e.host, port: e.port } };
+    if (!a || typeof a.host !== "string" || typeof a.port !== "number") return null;
+    return {
+      runtime: { host: r.host, port: r.port },
+      embeddings: { host: e.host, port: e.port },
+      agent: { host: a.host, port: a.port }
+    };
   } catch {
     return null;
   }
@@ -43,6 +52,7 @@ export function activate(context: vscode.ExtensionContext) {
 
   let client: RuntimeClient | null = null;
   let embClient: EmbeddingsClient | null = null;
+  let agentClient: AgentClient | null = null;
   let inflightRequestId: string | null = null;
   let inlinePipeline: InlineCompletionPipeline | null = null;
 
@@ -72,6 +82,24 @@ export function activate(context: vscode.ExtensionContext) {
     if (!embClient) embClient = new EmbeddingsClient(url);
     await embClient.connect();
     return embClient;
+  };
+
+  const ensureAgentClient = async (): Promise<AgentClient> => {
+    const root = getWorkspaceRoot();
+    if (!root) throw new Error("Open a workspace folder first.");
+    const cfg = tryReadRootConfig(root);
+    if (!cfg) throw new Error("Missing/invalid config.json at workspace root.");
+    const url = `ws://${cfg.agent.host}:${cfg.agent.port}`;
+    if (!agentClient) {
+      agentClient = new AgentClient(url);
+      agentClient.onState((s) => {
+        output.appendLine(`agent: ${s}`);
+        console.log(JSON.stringify({ service: "extension", event: "agent_state_change", state: s }));
+      });
+    }
+    await agentClient.connect();
+    console.log(JSON.stringify({ service: "extension", event: "agent_connected", url }));
+    return agentClient;
   };
 
   const retrieveRagSnippets = async (query: string, topK: number, timeoutMs: number) => {
@@ -186,6 +214,51 @@ export function activate(context: vscode.ExtensionContext) {
       await cfg.update("inlineCompletionEnabled", !cur, vscode.ConfigurationTarget.Workspace);
       vscode.window.showInformationMessage(`Offline Assistant inline completion: ${!cur ? "enabled" : "disabled"}`);
     })
+  );
+
+  const chatProvider = new ChatWebviewProvider(context.extensionUri);
+  chatProvider.onChatMessage(async (value, mode) => {
+    console.log(JSON.stringify({ service: "extension", event: "user_prompt", prompt: value, mode }));
+    try {
+      const ac = await ensureAgentClient();
+      chatProvider.startMessage();
+      console.log(JSON.stringify({ service: "extension", event: "streaming_start", mode }));
+
+      ac.runTask(value, {
+        onEvent: (ev: AgentEvent) => {
+          let summary = "";
+          if (ev.kind === "step_start") summary = `Starting orchestration step ${ev.step}`;
+          else if (ev.kind === "tool_call") summary = `Calling tool: ${ev.tool}`;
+          else if (ev.kind === "tool_result") summary = `Tool ${ev.ok ? "success" : "failed"}`;
+          else if (ev.kind === "model_action") {
+             const action = ev.action as any;
+             summary = action.kind || action.action || "AI reasoning";
+          }
+          
+          if (summary) chatProvider.addStep(ev.step, summary);
+        },
+        onFinal: (res) => {
+          console.log(JSON.stringify({ service: "extension", event: "streaming_end", ok: res.ok }));
+          if (res.ok && res.result) {
+            chatProvider.addToken(res.result);
+          } else if (!res.ok && res.error) {
+            chatProvider.error(res.error.message);
+          }
+          chatProvider.endMessage();
+        },
+        onError: (err) => {
+          console.log(JSON.stringify({ service: "extension", event: "streaming_error", error: err.message }));
+          chatProvider.error(err.message);
+          chatProvider.endMessage();
+        }
+      }, mode);
+    } catch (e) {
+      chatProvider.error(e instanceof Error ? e.message : "Failed to start agent task.");
+    }
+  });
+
+  context.subscriptions.push(
+    vscode.window.registerWebviewViewProvider(ChatWebviewProvider.viewType, chatProvider)
   );
 }
 

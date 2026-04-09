@@ -5,9 +5,12 @@ import type { IncomingMessage } from "node:http";
 import type { RawData } from "ws";
 import { loadRootConfig } from "./config";
 import { AuditLogger } from "./audit";
+import { Logger } from "./logger";
 import { parseClientMsg } from "./validate";
 import { AgentLoop } from "./agentLoop";
 import type { AgentToClient, AgentEvent } from "./types";
+
+const logger = new Logger("agent");
 
 const VERSION = "0.1.0";
 
@@ -33,7 +36,7 @@ async function main() {
   const projectRoot = getProjectRoot();
   const cfg = loadRootConfig(projectRoot);
   const audit = new AuditLogger(cfg.agent.auditLogDir);
-  const loop = new AgentLoop(cfg, audit);
+  const loop = new AgentLoop(cfg, audit, logger);
 
   const wss = new WebSocketServer({
     host: cfg.agent.host,
@@ -42,8 +45,10 @@ async function main() {
   });
 
   audit.log({ t: nowMs(), kind: "server_start", host: cfg.agent.host, port: cfg.agent.port });
+  logger.info("Agent server started", { host: cfg.agent.host, port: cfg.agent.port });
 
   wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
+    logger.info("Client connected");
     const clientId = newClientId();
     const remote = req.socket.remoteAddress;
     audit.log({ t: nowMs(), kind: "client_connect", clientId, remote });
@@ -84,20 +89,20 @@ async function main() {
       }
 
       // task
-      const { taskId, instruction } = m.msg;
+      const { taskId, instruction, mode } = m.msg;
       if (tasks.has(taskId)) {
         safeSend(ws, { type: "final", taskId, ok: false, error: { code: "E_INFLIGHT", message: "taskId already running" } });
         return;
       }
-
+      
       const ac = new AbortController();
       tasks.set(taskId, ac);
-      audit.log({ t: nowMs(), kind: "task_start", clientId, taskId, instructionBytes: Buffer.byteLength(instruction, "utf8") });
+      audit.log({ t: nowMs(), kind: "task_start", clientId, taskId, mode, instructionBytes: Buffer.byteLength(instruction, "utf8") });
       const startedAt = nowMs();
 
       (async () => {
         try {
-          const result = await loop.runTask(taskId, instruction, (ev) => emit(taskId, ev), ac.signal);
+          const result = await loop.runTask(taskId, instruction, (ev) => emit(taskId, ev), ac.signal, mode);
           safeSend(ws, { type: "final", taskId, ok: true, result });
           audit.log({ t: nowMs(), kind: "task_end", clientId, taskId, ok: true, elapsedMs: nowMs() - startedAt });
         } catch (e) {

@@ -87,17 +87,45 @@ export class RuntimeModel {
   }
 
   async proposeAction(prompt: string, maxTokens: number, signal: AbortSignal): Promise<ModelAction> {
-    const text = await this.generate(prompt, maxTokens, signal);
-    const parsed = extractFirstJsonObject(text);
-    const action = validateModelAction(parsed);
-    if (!action) throw new Error("Model did not return a valid JSON action.");
-    return action;
+    let currentPrompt = prompt;
+    let attempts = 0;
+    const maxAttempts = 2;
+
+    while (attempts < maxAttempts) {
+      attempts++;
+      const text = await this.generate(currentPrompt, maxTokens, signal);
+      const parsed = extractFirstJsonObject(text);
+      const action = validateModelAction(parsed);
+
+      if (action) {
+        return action;
+      }
+
+      console.warn(`[RuntimeModel] Attempt ${attempts} failed to produce valid JSON action.`, {
+        text: text.slice(0, 100) + (text.length > 100 ? "..." : "")
+      });
+
+      if (attempts < maxAttempts) {
+        currentPrompt = prompt + "\n\nERROR: Your previous response was not valid JSON or was missing required fields. " +
+          "You MUST output exactly ONE valid JSON object following the schema precisely. " +
+          "Do not include any conversational text or markdown blocks.";
+      }
+    }
+
+    throw new Error(`Model failed to return a valid JSON action after ${maxAttempts} attempts.`);
   }
 }
 
 export class MockModel {
-  proposeAction(instruction: string): ModelAction {
-    // Deterministic minimal policy for runnable Phase 5.
+  proposeAction(instruction: string, mode: "chat" | "agent" | "plan" = "agent"): ModelAction {
+    if (mode === "chat") {
+      return { action: "final", answer: `Mock Chat: I'm a coding assistant. You asked: "${instruction}". I don't use tools in chat mode.` };
+    }
+    if (mode === "plan") {
+      return { action: "final", answer: `Mock Plan: 1. Research ${instruction}. 2. Draft implementation. 3. Review logic.` };
+    }
+
+    // Deterministic minimal policy for runnable Phase 5 (agent mode).
     // Supports: "read <path>" and "search <query>"
     const trimmed = instruction.trim();
     const mRead = /^read\s+(.+)$/i.exec(trimmed);

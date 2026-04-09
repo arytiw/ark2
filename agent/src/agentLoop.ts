@@ -8,6 +8,7 @@ import { Planner } from "./planner";
 import { Executor } from "./executor";
 import { Verifier } from "./verifier";
 import { ActionBudget } from "./actionBudget";
+import { Logger } from "./logger";
 
 type Emit = (ev: AgentEvent) => void;
 
@@ -44,14 +45,15 @@ export class AgentLoop {
 
   constructor(
     private readonly projectCfg: RootConfig,
-    private readonly audit: AuditLogger
+    private readonly audit: AuditLogger,
+    private readonly logger: Logger
   ) {
     this.toolsUrl = `ws://${projectCfg.tools.host}:${projectCfg.tools.port}`;
     this.runtimeUrl = `ws://${projectCfg.runtime.host}:${projectCfg.runtime.port}`;
     this.embeddingsUrl = `ws://${projectCfg.embeddings.host}:${projectCfg.embeddings.port}`;
   }
 
-  async runTask(taskId: string, instruction: string, emit: Emit, signal: AbortSignal): Promise<string> {
+  async runTask(taskId: string, instruction: string, emit: Emit, signal: AbortSignal, mode: "chat" | "agent" | "plan" = "agent"): Promise<string> {
     const cfg: AgentConfig = this.projectCfg.agent;
     const tools = new ToolsClient(this.toolsUrl);
     const rag = new RagClient(this.embeddingsUrl);
@@ -64,6 +66,7 @@ export class AgentLoop {
 
     let history = "";
     const startedAt = Date.now();
+    this.logger.info("Agent task started", { taskId });
 
     try {
       // Preserve Phase 5 behavior in mock mode (no planning/verifying).
@@ -73,7 +76,9 @@ export class AgentLoop {
           if (Date.now() - startedAt > cfg.timeoutMs) throw new Error("Agent timeout.");
 
           emit({ kind: "step_start", step });
-          const action = mockModel.proposeAction(instruction);
+          const action = mockModel.proposeAction(instruction, mode);
+          this.logger.info("Agent step", { step, action });
+          this.logger.debug("Agent action", { action });
           emit({ kind: "model_action", step, action });
 
           if (action.action === "final") {
@@ -111,13 +116,44 @@ export class AgentLoop {
         maxBytesWritten: 2_000_000
       });
 
-      // PLAN
+      // Handle CHAT mode (Direct response, no tools)
+      if (mode === "chat") {
+        emit({ kind: "step_start", step: 1 });
+        this.logger.info("Agent step", { step: 1, mode: "chat" });
+        const built = promptBuilder.build({
+          systemConstraints: [
+            "You are a coding assistant. Do not call tools.",
+            "Provide helpful, concise explanations or code snippets.",
+            "You MUST output STRICT JSON only: {\"answer\":\"...\"}"
+          ],
+          goal: "Respond to the user request directly.",
+          instruction,
+          ragSnippets: [], // Could add RAG here if needed
+          historyText: "",
+          maxChars: 28000
+        });
+        const text = await runtimeModel.generate(built.prompt, cfg.llmMaxTokens, signal);
+        const answer = extractJsonAnswer(text) ?? "Model did not return a valid final JSON answer.";
+        emit({ kind: "model_action", step: 1, action: { kind: "final_json", raw: truncateForHistory(text, 1200) } });
+        emit({ kind: "step_end", step: 1 });
+        return answer;
+      }
+
+      // PLAN (Step 1 for both Agent and Plan modes)
       emit({ kind: "step_start", step: 1 });
+      this.logger.info("Agent step", { step: 1, mode: "planning" });
       const plan = await planner.plan(instruction, history, signal);
+      this.logger.debug("Agent action", { plan });
       emit({ kind: "model_action", step: 1, action: { kind: "plan", plan } });
       emit({ kind: "step_end", step: 1 });
 
-      // EXECUTE + VERIFY
+      // Handle PLAN mode (Stop after planning)
+      if (mode === "plan") {
+        return `Plan created successfully:\n\nGoal: ${plan.goal}\n\n` + 
+               plan.steps.map(s => `- ${s.id}: ${s.description}${s.tool ? ` (Tool: ${s.tool})` : ""}`).join("\n");
+      }
+
+      // EXECUTE + VERIFY (Agent mode only)
       let planStepIndex = 0;
       for (let orchestrationStep = 2; orchestrationStep <= cfg.maxSteps + 1; orchestrationStep++) {
         if (signal.aborted) throw new DOMException("Aborted", "AbortError");
@@ -222,7 +258,15 @@ export class AgentLoop {
         return `Verifier failed: ${verdict.reason}`;
       }
 
+      this.logger.info("Agent completed", { taskId });
       return "Max steps reached without a final answer.";
+    } catch (e) {
+      if (signal.aborted) {
+        this.logger.warn("Agent aborted", { taskId, reason: "Signal aborted" });
+      } else if (Date.now() - startedAt > cfg.timeoutMs) {
+        this.logger.warn("Agent aborted", { taskId, reason: "Timeout" });
+      }
+      throw e;
     } finally {
       runtimeModel?.close();
       rag.close();

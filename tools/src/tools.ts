@@ -5,6 +5,7 @@ import crypto from "node:crypto";
 import type { ToolsConfig, ToolName } from "./types";
 import { WorkspaceSandbox } from "./sandbox";
 import { applyUnifiedDiff } from "./diff";
+import { Logger } from "./logger";
 
 type Ok<T> = { ok: true; result: T };
 type Err = { ok: false; code: string; message: string };
@@ -35,23 +36,24 @@ export class ToolExecutor {
 
   constructor(
     private readonly workspaceRoot: string,
-    private readonly cfg: ToolsConfig
+    private readonly cfg: ToolsConfig,
+    private readonly logger: Logger
   ) {
     this.sandbox = new WorkspaceSandbox(workspaceRoot);
   }
 
-  async call(tool: ToolName, params: Record<string, unknown>): Promise<Ok<unknown> | Err> {
+  async call(tool: ToolName, params: Record<string, unknown>, requestId: string): Promise<Ok<unknown> | Err> {
     switch (tool) {
       case "read_file":
-        return this.readFile(params);
+        return this.readFile(params, requestId);
       case "write_file":
-        return this.writeFile(params);
+        return this.writeFile(params, requestId);
       case "apply_diff":
-        return this.applyDiff(params);
+        return this.applyDiff(params, requestId);
       case "list_files":
-        return this.listFiles(params);
+        return this.listFiles(params, requestId);
       case "search_code":
-        return this.searchCode(params);
+        return this.searchCode(params, requestId);
       default:
         return { ok: false, code: "E_TOOL", message: "Unknown tool." };
     }
@@ -65,9 +67,10 @@ export class ToolExecutor {
     return { ok: true, abs: r.abs };
   }
 
-  private async readFile(params: Record<string, unknown>): Promise<Ok<unknown> | Err> {
+  private async readFile(params: Record<string, unknown>, requestId: string): Promise<Ok<unknown> | Err> {
     const r = this.resolvePathParam(params);
     if (!r.ok) return r;
+    this.logger.debug("File read/write", { path: r.abs, requestId });
     const st = await statIfExists(r.abs);
     if (!st || !st.isFile()) return { ok: false, code: "E_NOT_FOUND", message: "File not found." };
     if (st.size > this.cfg.maxFileBytes) return { ok: false, code: "E_TOO_LARGE", message: "File exceeds maxFileBytes." };
@@ -84,9 +87,10 @@ export class ToolExecutor {
     };
   }
 
-  private async writeFile(params: Record<string, unknown>): Promise<Ok<unknown> | Err> {
+  private async writeFile(params: Record<string, unknown>, requestId: string): Promise<Ok<unknown> | Err> {
     const r = this.resolvePathParam(params);
     if (!r.ok) return r;
+    this.logger.debug("File read/write", { path: r.abs, requestId });
     const content = params.content;
     if (typeof content !== "string") return { ok: false, code: "E_PARAMS", message: "content must be a string" };
     const bytes = Buffer.byteLength(content, "utf8");
@@ -118,9 +122,10 @@ export class ToolExecutor {
     };
   }
 
-  private async applyDiff(params: Record<string, unknown>): Promise<Ok<unknown> | Err> {
+  private async applyDiff(params: Record<string, unknown>, requestId: string): Promise<Ok<unknown> | Err> {
     const r = this.resolvePathParam(params);
     if (!r.ok) return r;
+    this.logger.debug("File read/write", { path: r.abs, requestId });
     const diff = params.diff;
     if (typeof diff !== "string" || diff.length === 0) return { ok: false, code: "E_PARAMS", message: "diff must be a non-empty string" };
 
@@ -150,7 +155,7 @@ export class ToolExecutor {
     };
   }
 
-  private async listFiles(params: Record<string, unknown>): Promise<Ok<unknown> | Err> {
+  private async listFiles(params: Record<string, unknown>, requestId: string): Promise<Ok<unknown> | Err> {
     const dirParam = params.directory;
     if (typeof dirParam !== "string") return { ok: false, code: "E_PARAMS", message: "directory must be a string" };
     const resolved = this.sandbox.resolvePath(dirParam);
@@ -186,7 +191,7 @@ export class ToolExecutor {
     return { ok: true, result: { directory: toRel(this.workspaceRoot, abs), entries: results, truncated: results.length >= this.cfg.maxListEntries } };
   }
 
-  private async searchCode(params: Record<string, unknown>): Promise<Ok<unknown> | Err> {
+  private async searchCode(params: Record<string, unknown>, requestId: string): Promise<Ok<unknown> | Err> {
     const query = params.query;
     if (typeof query !== "string" || query.length === 0) return { ok: false, code: "E_PARAMS", message: "query must be a non-empty string" };
 
