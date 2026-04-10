@@ -224,8 +224,17 @@ export function activate(context: vscode.ExtensionContext) {
       chatProvider.startMessage();
       console.log(JSON.stringify({ service: "extension", event: "streaming_start", mode }));
 
+      let tokenCount = 0;
+
       ac.runTask(value, {
         onEvent: (ev: AgentEvent) => {
+          if (ev.kind === "token") {
+            tokenCount++;
+            console.log(JSON.stringify({ service: "extension", event: "token_received", size: ev.token.length }));
+            chatProvider.addToken(ev.token);
+            return;
+          }
+
           let summary = "";
           if (ev.kind === "step_start") summary = `Starting orchestration step ${ev.step}`;
           else if (ev.kind === "tool_call") summary = `Calling tool: ${ev.tool}`;
@@ -238,10 +247,15 @@ export function activate(context: vscode.ExtensionContext) {
           if (summary) chatProvider.addStep(ev.step, summary);
         },
         onFinal: (res) => {
-          console.log(JSON.stringify({ service: "extension", event: "streaming_end", ok: res.ok }));
-          if (res.ok && res.result) {
-            chatProvider.addToken(res.result);
-          } else if (!res.ok && res.error) {
+          let ok = res.ok;
+          if (tokenCount === 0 && !res.error) {
+            ok = false;
+            vscode.window.showWarningMessage("No tokens received from agent");
+          }
+
+          console.log(JSON.stringify({ service: "extension", event: "streaming_end", ok }));
+          
+          if (!ok && res.error) {
             chatProvider.error(res.error.message);
           }
           chatProvider.endMessage();
@@ -252,6 +266,7 @@ export function activate(context: vscode.ExtensionContext) {
           chatProvider.endMessage();
         }
       }, mode);
+
     } catch (e) {
       chatProvider.error(e instanceof Error ? e.message : "Failed to start agent task.");
     }

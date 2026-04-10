@@ -132,7 +132,12 @@ export class AgentLoop {
           historyText: "",
           maxChars: 28000
         });
-        const text = await runtimeModel.generate(built.prompt, cfg.llmMaxTokens, signal);
+        const text = await runtimeModel.generate(built.prompt, cfg.llmMaxTokens, signal, (token) => {
+          emit({ kind: "token", token });
+        });
+        if (!text) {
+          throw Object.assign(new Error("Model returned no output"), { code: "E_EMPTY_RESPONSE" });
+        }
         const answer = extractJsonAnswer(text) ?? "Model did not return a valid final JSON answer.";
         emit({ kind: "model_action", step: 1, action: { kind: "final_json", raw: truncateForHistory(text, 1200) } });
         emit({ kind: "step_end", step: 1 });
@@ -181,7 +186,12 @@ export class AgentLoop {
             extraSections: [{ title: "Plan step", content: `${step.id}: ${step.description}` }],
             maxChars: 28000
           });
-          const text = await runtimeModel.generate(built.prompt, cfg.llmMaxTokens, signal);
+          const text = await runtimeModel.generate(built.prompt, cfg.llmMaxTokens, signal, (token) => {
+            emit({ kind: "token", token });
+          });
+          if (!text) {
+            throw Object.assign(new Error("Model returned no output"), { code: "E_EMPTY_RESPONSE" });
+          }
           const answer = extractJsonAnswer(text) ?? "Model did not return a valid final JSON answer.";
           emit({ kind: "model_action", step: orchestrationStep, action: { kind: "final_json", raw: truncateForHistory(text, 1200) } });
           emit({ kind: "step_end", step: orchestrationStep });

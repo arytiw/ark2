@@ -51,11 +51,18 @@ export class RuntimeModel {
     this.client.close();
   }
 
-  async generate(prompt: string, maxTokens: number, signal: AbortSignal): Promise<string> {
+  async generate(prompt: string, maxTokens: number, signal: AbortSignal, onToken?: (t: string) => void): Promise<string> {
     const requestId = newRequestId();
     let text = "";
     const unsub = this.client.onMessage((m) => {
-      if (m.type === "token" && m.requestId === requestId) text += m.token;
+      if (m.type === "token" && m.requestId === requestId) {
+        console.log(`[AgentModel] Token received from runtime: ${m.token.length} bytes`);
+        if (onToken) {
+          console.log(`[AgentModel] Forwarding token to extension`);
+          onToken(m.token);
+        }
+        text += m.token;
+      }
     });
 
     const abortHandler = () => {
@@ -74,7 +81,9 @@ export class RuntimeModel {
             resolve();
           } else if (m.type === "error" && m.requestId === requestId) {
             off();
-            reject(new Error(m.message));
+            const err = new Error(m.message) as any;
+            err.code = m.code;
+            reject(err);
           }
         });
       });

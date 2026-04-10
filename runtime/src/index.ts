@@ -142,7 +142,7 @@ async function main() {
           (token) => {
             // Non-blocking on WS send: ws buffers internally; if backpressure becomes a problem, we’ll add a bounded queue.
             audit.log({ t: nowMs(), kind: "request_token", clientId, requestId, tokenBytes: Buffer.byteLength(token, "utf8") });
-            logger.debug("Streaming token", { requestId, token });
+            logger.info("Sending token", { requestId, tokenBytes: Buffer.byteLength(token, "utf8") });
             safeSend(ws, { type: "token", requestId, token });
           },
           ac.signal

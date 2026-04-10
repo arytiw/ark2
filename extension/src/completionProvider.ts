@@ -19,6 +19,7 @@ function newRequestId(): string {
 
 export class InlineCompletionPipeline {
   private inflight: { requestId: string } | null = null;
+  private lastDocText: string = "";
 
   constructor(
     private readonly output: vscode.OutputChannel,
@@ -35,6 +36,12 @@ export class InlineCompletionPipeline {
 
         // One at a time to keep deterministic and easy to audit.
         if (this.inflight) return { items: [] };
+
+        const newText = document.getText();
+        if (newText === this.lastDocText) {
+          return { items: [] };
+        }
+        this.lastDocText = newText;
 
         const querySeed = document.getText(new vscode.Range(new vscode.Position(Math.max(0, position.line - 20), 0), position)).slice(-1200);
         let ragSnippets: Array<{ path: string; preview: string; score: number }> = [];

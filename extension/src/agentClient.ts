@@ -6,7 +6,8 @@ export type AgentEvent =
   | { kind: "model_action"; step: number; action: unknown }
   | { kind: "tool_call"; step: number; requestId: string; tool: string; params: unknown }
   | { kind: "tool_result"; step: number; requestId: string; ok: boolean; result?: unknown; error?: { code: string; message: string } }
-  | { kind: "step_end"; step: number };
+  | { kind: "step_end"; step: number }
+  | { kind: "token"; token: string };
 
 export type AgentToClient =
   | { type: "ready"; version: string }
